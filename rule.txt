@@ -1,0 +1,14 @@
+Mô hình có thể sử dụng
+LLM: Qwen3.5 Series, Gemma-4 Series.
+
+Embedding/Rerank: BGE-m3, Qwen-Rerank.
+
+Yêu cầu: Bài dự thi được nộp trực tuyến gồm các nội dung:
+
+Docker Container: Docker hub.
+
+Entry-point: Đọc public_test.csv hoặc private_test.csv tại /data, ghi pred.csv vào /output với hai cột: qid,answer (A/B/C/D).
+
+Github chứa code và các chạy reproduce kết quả trong container.
+
+Tài liệu thuyết minh phương pháp

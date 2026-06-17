@@ -1,0 +1,33 @@
+app:
+  name: "HackAIthon2026_MultiAgent"
+  environment: "production"
+  debug: false
+
+llm:
+  model_name: "google/gemma-4-E4B-it"
+  max_seq_length: 2048
+  load_in_4bit: true
+
+agents:
+  router:
+    temperature: 0.0
+    max_new_tokens: 32
+  qa:
+    temperature: 0.2
+    max_new_tokens: 256
+  voting:
+    temperature: 0.3
+    num_runs: 3
+
+sandbox:
+  timeout_sec: 5
+  max_retries: 2
+
+pipeline:
+  batch_size: 10
+
+paths:
+  data_dir: "/data"
+  output_dir: "/output"
+  checkpoint_file: "pipeline_checkpoint.json"
+  test_file: "public_test.csv"

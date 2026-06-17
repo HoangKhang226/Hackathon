@@ -1,0 +1,10 @@
+unsloth
+torch
+transformers
+pandas
+sympy
+pydantic
+pydantic-settings
+python-dotenv
+PyYAML
+tqdm
