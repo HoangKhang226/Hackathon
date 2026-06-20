@@ -12,9 +12,15 @@ agents:
   router:
     temperature: 0.0
     max_new_tokens: 32
+    batch_size: 10
   qa:
     temperature: 0.2
     max_new_tokens: 256
+    batch_size: 10
+  reading:
+    temperature: 0.2
+    max_new_tokens: 384
+    batch_size: 5
   voting:
     temperature: 0.3
     num_runs: 3

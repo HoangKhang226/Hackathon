@@ -23,6 +23,8 @@ class LlmConfig(BaseModel):
 class AgentParams(BaseModel):
     temperature: float
     max_new_tokens: int = 256
+    batch_size: int = 10
+
 
 
 class VotingParams(BaseModel):
@@ -33,6 +35,7 @@ class VotingParams(BaseModel):
 class AgentsConfig(BaseModel):
     router: AgentParams
     qa: AgentParams
+    reading: AgentParams
     voting: VotingParams
 
 
