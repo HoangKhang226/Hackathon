@@ -25,7 +25,7 @@ def llm_router_node(state: GraphState, model, tokenizer, checkpoint_callback: Ca
     if not state.get("choice_counts"):
         state["choice_counts"] = [len(q["choices"]) for q in state["questions"]]
 
-    node_batch_size = 5
+    node_batch_size = 10
     total_questions = len(state["questions"])
 
     for i in range(0, total_questions, node_batch_size):

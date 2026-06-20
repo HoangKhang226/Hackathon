@@ -14,7 +14,7 @@ def fast_qa_agent_node(state: GraphState, model, tokenizer, checkpoint_callback:
         return state
 
     print(f"\n[Node 2]: Khởi chạy Fast-QA Agent giải quyết {len(indices)} câu tri thức ngắn (Đường cao tốc)...")
-    node_batch_size = 5
+    node_batch_size = 10
     total_prompts = len(indices)
 
     for i in range(0, total_prompts, node_batch_size):

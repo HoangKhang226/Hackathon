@@ -14,7 +14,7 @@ def reading_comprehension_agent_node(state: GraphState, model, tokenizer, checkp
         return state
 
     print(f"\n[Node 3]: Khởi chạy Reading Comprehension Agent bóc tách {len(indices)} câu văn bản ngữ cảnh dài...")
-    node_batch_size = 5
+    node_batch_size = 10
     total_prompts = len(indices)
 
     for i in range(0, total_prompts, node_batch_size):
