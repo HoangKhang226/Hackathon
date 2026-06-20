@@ -4,7 +4,10 @@ from pydantic import BaseModel, Field, ValidationError
 from typing import Literal
 
 from src.agents.state import GraphState
-from src.core.llm_engine import unsloth_json_batch_inference
+from src.core.llm_engine import batch_inference
+from src.core.config import settings
+from src.utils.logger import logger
+from src.pipeline.checkpointing import save_checkpoint
 
 # Bảng chữ cái ánh xạ đáp án
 LETTER_MAP = {i: chr(65 + i) for i in range(26)}
@@ -19,13 +22,14 @@ class RouterSchema(BaseModel):
 
 def llm_router_node(state: GraphState, model, tokenizer, checkpoint_callback: Callable = None) -> GraphState:
     """Agent phân loại câu hỏi vào 3 luồng: FAST_QA, READING, CODEABLE."""
-    print("\n" + "="*75 + "\n[Node 1]: Khởi chạy LLM Router Agent\n" + "="*75)
+    logger.info("="*75 + "\n[Node 1]: Khởi chạy LLM Router Agent\n" + "="*75)
 
     # Đếm số phương án nếu chưa có
     if not state.get("choice_counts"):
         state["choice_counts"] = [len(q["choices"]) for q in state["questions"]]
 
-    node_batch_size = 10
+    cfg = settings.agents.router
+    node_batch_size = cfg.batch_size
     total_questions = len(state["questions"])
 
     for i in range(0, total_questions, node_batch_size):
@@ -35,7 +39,7 @@ def llm_router_node(state: GraphState, model, tokenizer, checkpoint_callback: Ca
         if all(state["routes"][k] != "" for k in range(i, end_idx)):
             continue
 
-        print(f"      [Router Progress] Đang xử lý câu thứ {i + 1} đến {end_idx} / Tổng {total_questions} câu...")
+        logger.info(f"      [Router Progress] Đang xử lý câu thứ {i + 1} đến {end_idx} / Tổng {total_questions} câu...")
         batch_questions = state["questions"][i:end_idx]
         prompts = []
         for q in batch_questions:
@@ -57,8 +61,12 @@ def llm_router_node(state: GraphState, model, tokenizer, checkpoint_callback: Ca
             ], tokenize=False, add_generation_prompt=True)
             prompts.append(prompt)
 
-        # Suy luận batch (Temperature = 0.0 để đảm bảo tính nhất quán)
-        raw_outputs = unsloth_json_batch_inference(model, tokenizer, prompts, max_new_tokens=32, temperature=0.0, node_batch_size=node_batch_size)
+        raw_outputs = batch_inference(
+            model, tokenizer, prompts,
+            max_new_tokens=cfg.max_new_tokens,
+            temperature=cfg.temperature,
+            micro_batch_size=cfg.batch_size
+        )
 
         for j, raw_out in enumerate(raw_outputs):
             try:
@@ -71,6 +79,9 @@ def llm_router_node(state: GraphState, model, tokenizer, checkpoint_callback: Ca
 
         if checkpoint_callback:
             checkpoint_callback(state)
+        save_checkpoint(state)
 
-    print(f"[Router Kết Quả] Hoàn tất định tuyến cho {total_questions} câu.")
+    from collections import Counter
+    counts = Counter(state["routes"])
+    logger.info("[Router Kết Quả] Hoàn tất định tuyến cho %d câu. Chi tiết: %s", total_questions, dict(counts))
     return state

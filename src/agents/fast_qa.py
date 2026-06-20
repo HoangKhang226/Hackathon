@@ -1,6 +1,9 @@
 from typing import Callable
 from src.agents.state import GraphState
-from src.core.llm_engine import unsloth_json_batch_inference
+from src.core.llm_engine import batch_inference
+from src.core.config import settings
+from src.utils.logger import logger
+from src.pipeline.checkpointing import save_checkpoint
 
 LETTER_MAP = {i: chr(65 + i) for i in range(26)}
 
@@ -13,8 +16,9 @@ def fast_qa_agent_node(state: GraphState, model, tokenizer, checkpoint_callback:
     if not indices:
         return state
 
-    print(f"\n[Node 2]: Khởi chạy Fast-QA Agent giải quyết {len(indices)} câu tri thức ngắn (Đường cao tốc)...")
-    node_batch_size = 10
+    logger.info(f"\n[Node 2]: Khởi chạy Fast-QA Agent giải quyết {len(indices)} câu tri thức ngắn (Đường cao tốc)...")
+    cfg = settings.agents.qa
+    node_batch_size = cfg.batch_size
     total_prompts = len(indices)
 
     for i in range(0, total_prompts, node_batch_size):
@@ -24,7 +28,7 @@ def fast_qa_agent_node(state: GraphState, model, tokenizer, checkpoint_callback:
         if all(state["final_answers"][idx] != "" for idx in batch_indices):
             continue
 
-        print(f"      [LLM Batch Progress] Đang xử lý câu thứ {i + 1} đến {end_idx} / Tổng {total_prompts} câu...")
+        logger.info(f"      [LLM Batch Progress] Đang xử lý câu thứ {i + 1} đến {end_idx} / Tổng {total_prompts} câu...")
         prompts = []
         for idx in batch_indices:
             q = state["questions"][idx]
@@ -60,11 +64,17 @@ def fast_qa_agent_node(state: GraphState, model, tokenizer, checkpoint_callback:
             ], tokenize=False, add_generation_prompt=True)
             prompts.append(prompt)
 
-        raw_outputs = unsloth_json_batch_inference(model, tokenizer, prompts, max_new_tokens=128, temperature=0.2, node_batch_size=node_batch_size)
+        raw_outputs = batch_inference(
+            model, tokenizer, prompts,
+            max_new_tokens=cfg.max_new_tokens,
+            temperature=cfg.temperature,
+            micro_batch_size=cfg.batch_size
+        )
         for j, raw_out in enumerate(raw_outputs):
             state["final_answers"][batch_indices[j]] = raw_out
 
         if checkpoint_callback:
             checkpoint_callback(state)
+        save_checkpoint(state)
 
     return state
