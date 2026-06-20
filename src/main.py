@@ -19,7 +19,6 @@ def get_batches(state, batch_size: int = 10):
 
 
 
-# Pseudocode
 def main():
     # 1. Load model (Khải)
     engine = load_model()
@@ -50,3 +49,6 @@ def main():
     
     # 4. Ghi kết quả
     save_predictions(state)
+
+if __name__ == "__main__":
+    main()
