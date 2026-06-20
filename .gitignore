@@ -13,6 +13,7 @@ temp_sandbox.py
 temp_sandbox_*.py
 pred.csv
 pipeline_checkpoint.json
+submission_kaggle.ipynb
 
 # Conda environments or virtual environments
 .venv/
