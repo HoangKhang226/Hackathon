@@ -20,3 +20,7 @@ submission_kaggle.ipynb
 env/
 venv/
 ENV/
+
+# Data folder (local dataset)
+data/
+
