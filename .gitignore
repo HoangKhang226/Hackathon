@@ -1,0 +1,21 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE configurations
+.vscode/
+.idea/
+
+# Local outputs & checkpoints
+output/
+temp_sandbox.py
+temp_sandbox_*.py
+pred.csv
+pipeline_checkpoint.json
+
+# Conda environments or virtual environments
+.venv/
+env/
+venv/
+ENV/

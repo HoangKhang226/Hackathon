@@ -2,7 +2,9 @@ from pathlib import Path
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import yaml
-from src.utils.logger import logger
+import logging
+
+logger = logging.getLogger("HackAIthon_Agent")
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _SETTING_FILE = _PROJECT_ROOT / "config" / "settings.yaml"
@@ -23,16 +25,23 @@ class LlmConfig(BaseModel):
 class AgentParams(BaseModel):
     temperature: float
     max_new_tokens: int = 256
+    batch_size: int = 10
 
 
 class VotingParams(BaseModel):
     temperature: float
-    num_runs: int
+    max_new_tokens: int = 256
+    num_runs: int = 3
+    batch_size: int = 2
 
 
 class AgentsConfig(BaseModel):
     router: AgentParams
-    qa: AgentParams
+    fast_qa: AgentParams
+    reading: AgentParams
+    coder: AgentParams
+    correction: AgentParams
+    fallback: AgentParams
     voting: VotingParams
 
 
@@ -41,15 +50,10 @@ class SandboxConfig(BaseModel):
     max_retries: int
 
 
-class PipelineConfig(BaseModel):
-    batch_size: int
-
-
 class PathsConfig(BaseModel):
     data_dir: str
     output_dir: str
     checkpoint_file: str
-    test_file: str
 
 
 class Settings(BaseSettings):
@@ -57,7 +61,6 @@ class Settings(BaseSettings):
     llm: LlmConfig
     agents: AgentsConfig
     sandbox: SandboxConfig
-    pipeline: PipelineConfig
     paths: PathsConfig
 
     model_config = SettingsConfigDict(
@@ -65,19 +68,19 @@ class Settings(BaseSettings):
     )
 
 
-def load_setting() -> Settings:
+def load_settings() -> Settings:
     if not _SETTING_FILE.exists():
-        raise FileNotFoundError("settings.yaml not found")
+        raise FileNotFoundError(f"settings.yaml not found at {_SETTING_FILE}")
 
     with open(_SETTING_FILE, "r", encoding="utf-8") as f:
-        setting_config = yaml.safe_load(f)
+        raw = yaml.safe_load(f)
 
-    return Settings(**setting_config)
+    return Settings(**raw)
 
 
 try:
-    settings = load_setting()
-    logger.info("Settings loaded successfully")
+    settings = load_settings()
+    logger.info("Settings loaded: model=%s, seq_len=%d", settings.llm.model_name, settings.llm.max_seq_length)
 except Exception as e:
-    logger.error(f"Error while loading settings: {e}")
+    logger.error("Failed to load settings: %s", e)
     raise

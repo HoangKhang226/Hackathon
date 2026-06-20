@@ -5,29 +5,44 @@ app:
 
 llm:
   model_name: "google/gemma-4-E4B-it"
-  max_seq_length: 2048
+  max_seq_length: 4096
   load_in_4bit: true
 
 agents:
   router:
     temperature: 0.0
     max_new_tokens: 32
-  qa:
+    batch_size: 10
+  fast_qa:
+    temperature: 0.0
+    max_new_tokens: 128
+    batch_size: 10
+  reading:
+    temperature: 0.1
+    max_new_tokens: 384
+    batch_size: 10
+  coder:
+    temperature: 0.0
+    max_new_tokens: 512
+    batch_size: 8
+  correction:
+    temperature: 0.1
+    max_new_tokens: 512
+    batch_size: 8
+  fallback:
     temperature: 0.2
-    max_new_tokens: 256
+    max_new_tokens: 384
   voting:
     temperature: 0.3
+    max_new_tokens: 256
     num_runs: 3
+    batch_size: 2
 
 sandbox:
   timeout_sec: 5
   max_retries: 2
 
-pipeline:
-  batch_size: 10
-
 paths:
   data_dir: "/data"
   output_dir: "/output"
   checkpoint_file: "pipeline_checkpoint.json"
-  test_file: "public_test.csv"
