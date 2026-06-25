@@ -1,173 +1,112 @@
-# Multi-Agent AI System — Google Gemini Hackathon 2026
+# Vietnamese Student HackAIthon 2026 - Bảng C (Innovator)
 
-> **Hệ thống Multi-Agent AI** được xây dựng để giải quyết bài toán phân loại và xử lý đa mô thức của BTC Google Gemini Hackathon 2026. Hệ thống tích hợp 4 Agent độc lập, sử dụng 1 LLM duy nhất với công nghệ **Unsloth** để tối ưu VRAM, chạy trên Docker và có khả năng **Checkpoint** chống sập.
+## 📌 Tổng Quan Dự Án
+Đây là kho mã nguồn (Repository) của đội thi tham dự Bảng C - Cuộc thi **Vietnamese Student HackAIthon 2026**. 
+Hệ thống là một **AI Agent Pipeline (Multi-Agent Graph)** xử lý đa tác vụ giải quyết bộ câu hỏi trắc nghiệm (MCQ) đa lĩnh vực. Hệ thống sử dụng mô hình **`google/gemma-4-E4B-it`** (qua Unsloth 4-bit) nhằm tối đa hóa **Accuracy** và **Inference Time**.
 
-## 1. Kiến Trúc Hệ Thống (System Architecture)
+Đặc điểm cốt lõi của hệ thống:
+- **Phân luồng thông minh (Router Agent):** Tự động nhận diện và phân phối câu hỏi về các nhánh xử lý tối ưu nhất (Kiến thức nền, Đọc hiểu, Toán học).
+- **Tool-Use & Sandbox (Coder Agent):** Với các câu hỏi toán học/định lượng, LLM không tự tính toán mà đóng vai trò là một Lập trình viên sinh mã Python. Mã được chạy trong môi trường cách ly (Sandbox) với độ chính xác số học tuyệt đối.
+- **Tự sửa lỗi (Self-Correction):** Nếu mã Python lỗi hoặc kết quả in ra không trùng khớp số liệu, hệ thống tự động nạp log lỗi (`stderr`/`stdout`) để sửa code.
+- **Bầu chọn đa số (Majority Voting):** Hợp nhất kết quả từ Sandbox và các luồng suy luận văn bản độc lập để chọn ra đáp án đúng nhất bằng cách bỏ phiếu.
+- **Cơ chế phục hồi (Checkpointing):** Liên tục sao lưu trạng thái GraphState để phòng tránh lỗi OOM hoặc mất kết nối, hệ thống sẽ tự động khôi phục và chạy tiếp thay vì bắt đầu lại từ đầu.
 
-Hệ thống áp dụng kiến trúc **Multi-Agent Orchestration** với tầng điều phối tập trung (`router.py`) và các tầng xử lý chuyên biệt. Toàn bộ được đóng gói trong Docker và mount dữ liệu thông qua Volume.
-Sơ đồ thể hiện luồng dữ liệu của batch 10 câu hỏi đi qua các Agent:
+---
+
+## 🏗️ Sơ Đồ Kiến Trúc Hệ Thống (Multi-Agent Pipeline)
 
 ```mermaid
 flowchart TD
-    Start([main.py]) --> Setup["Load Unsloth + VRAM cleanup"]
-    Setup --> LoadData["Đọc /data/*.csv"]
-    LoadData --> Checkpoint{"Có checkpoint cũ?"}
-    Checkpoint -->|Có| Resume["Nạp lại, bỏ qua câu đã xong"]
-    Checkpoint -->|Không| Fresh["Chạy mới"]
-    Resume --> Router
-    Fresh --> Router
+    Start([Bắt đầu]) --> Setup["Nạp Dữ Liệu Thi & Khởi Tạo Trạng Thái GraphState"]
+    Setup --> CheckpointCheck{"Có Checkpoint Cũ?"}
+    
+    CheckpointCheck -->|Có| LoadCheckpoint["Nạp tiến trình đã lưu"]
+    CheckpointCheck -->|Không| InitState["Bắt đầu tiến trình mới"]
+    
+    LoadCheckpoint --> RouterNode
+    InitState --> RouterNode
 
-    subgraph Router ["Node 1: Router Agent"]
-        Router_logic["Phân loại → FAST_QA / READING / CODEABLE"]
+    subgraph Node1 ["NODE 1: LLM Router Agent"]
+        RouterNode["Phân loại câu hỏi bằng LLM\n(FAST_QA | READING | CODEABLE)"]
     end
 
-    Router -->|FAST_QA| FastQA["Node 2: Fast-QA\nZero-shot, /no_think"]
-    Router -->|READING| Reading["Node 3: Reading\nCoT, /think"]
-    Router -->|CODEABLE| Coder["Node 4: Coder Agent\nSinh code Python"]
+    RouterNode -->|FAST_QA| FastQAPath["Node 2: Fast-QA Agent\n(Zero-Shot cô đọng tri thức)"]
+    RouterNode -->|READING| ReadingPath["Node 3: Reading Agent\n(Chain-of-Thought rà quét văn bản dài)"]
+    RouterNode -->|CODEABLE| CoderPath["Node 4: Coder Agent\n(Sinh mã giải thuật Python)"]
 
-    Coder --> Sandbox{"Node 5: Sandbox\nsubprocess, timeout 5s"}
-    Sandbox -->|OK| Match["SUCCESS_MATCH"]
-    Sandbox -->|Lỗi| Retry{"Còn lượt? (max 2)"}
-    Retry -->|Có| Fix["Correction Agent\nĐọc stderr, sửa code"]
-    Fix --> Sandbox
-    Retry -->|Không| Fallback["Fallback Agent\nSuy luận text"]
+    subgraph Node5 ["NODE 5: Coder & Sandbox Loop"]
+        CoderPath --> ExecCode["Chạy Python Code trong Sandbox\n(Timeout 5 giây)"]
+        ExecCode --> CheckSuccess{"Thành công & Khớp số?"}
+        
+        CheckSuccess -->|Có| MatchSuccess["Ghi nhận SUCCESS_MATCH"]
+        CheckSuccess -->|Không| CheckRetries{"Còn lượt sửa?\n(Tối đa 2 lần)"}
+        
+        CheckRetries -->|Có| CorrectionAgent["LLM Correction Agent\nĐọc log lỗi để sửa code"]
+        CorrectionAgent --> ExecCode
+        
+        CheckRetries -->|Không| FallbackAgent["LLM Fallback Agent\nBiện luận văn bản thay thế"]
+    end
 
-    Match --> Voting["Majority Voting\nSandbox +2 phiếu\nLLM 3 vòng +3 phiếu"]
-    Fallback --> Voting
+    MatchSuccess --> VoteLogic
+    FallbackAgent --> VoteLogic
 
-    FastQA --> Mapper
-    Reading --> Mapper
-    Voting --> Mapper
+    subgraph VotingNode ["Majority Voting (CODEABLE)"]
+        VoteLogic["LLM Majority Voting\n(Sandbox +2 phiếu, LLM 3 lượt lấy phiếu)"]
+    end
 
-    Mapper["Node 6: Dynamic Mapper\nLọc rác → chốt A/B/C/D"] --> Output["Ghi /output/pred.csv"]
+    FastQAPath --> MapperNode
+    ReadingPath --> MapperNode
+    VoteLogic --> MapperNode
+
+    MapperNode["Node 6: Dynamic Mapper\nLọc nhiễu văn bản thừa, chuẩn hóa về A, B, C, D"] --> Save["Lưu kết quả ra /output/pred.csv"]
+    Save --> End([Hoàn thành])
 ```
 
-## 2. Công Nghệ Sử Dụng (Tech Stack)
+---
 
-| Danh Mục             | Công Nghệ               | Vai Trò                        |
-| :------------------- | :---------------------- | :----------------------------- |
-| **LLM**              | `google/gemma-4-E4B-it` | Engine xử lý đa nhiệm          |
-| **Inference**        | `unsloth`               | Tối ưu Unsloth 4-bit Inference |
-| **Routing**          | State Graph             | Xây dựng Multi-Agent Graph     |
-| **Configuration**    | Pydantic, YAML          | Quản lý cấu hình, validate env |
-| **Containerization** | Docker                  | Đóng gói môi trường chuẩn BTC  |
-| **I/O & Data**       | Pandas                  | Đọc/Ghi CSV                    |
-| **Math & Logic**     | SymPy                   | Xử lý phương trình và đại số   |
+## 🚀 Hướng Dẫn Triển Khai (Reproduce Kết Quả)
 
-## Yêu Cầu Hệ Thống
+Theo đúng yêu cầu của Ban Tổ Chức, hệ thống đã được đóng gói hoàn chỉnh bằng Docker và sẵn sàng cho việc kiểm chứng trên môi trường của BTC.
 
-- Hệ điều hành: Linux/Windows có hỗ trợ Docker.
-- Card Đồ Họa: Tối thiểu 1 GPU (NVIDIA T4 16GB VRAM) do đã sử dụng `unsloth` 4-bit.
-- Thư viện: Xem chi tiết trong file `requirements.txt`.
+### 1. Cấu Trúc Mount Thư Mục Bắt Buộc
+- **`/data`**: Thư mục chứa dữ liệu đầu vào. Hệ thống sẽ tự động quét và nạp file `public_test.csv` hoặc `private_test.csv` có trong thư mục này.
+- **`/output`**: Thư mục chứa dữ liệu đầu ra. Hệ thống sẽ ghi kết quả cuối cùng vào file `pred.csv` tại đây với định dạng 2 cột: `qid,answer`.
 
-## 3. Chi Tiết Các Agent & Module
+### 2. Các Bước Build và Chạy Bằng Docker
 
-### 3.1. Tầng Orchestration (Pipeline)
-
-Module trung tâm điều phối luồng xử lý và đảm bảo tính toàn vẹn của hệ thống.
-
-| Module                            | Chức năng                                      | Công Nghệ |
-| :-------------------------------- | :--------------------------------------------- | :-------- |
-| `src/main.py`                     | Entry point, khởi tạo LLM, khởi tạo Graph      |
-| `src/agents/state.py`             | `TypedDict` định nghĩa luồng dữ liệu qua graph |
-| `src/pipeline/io_handler.py`      | Đọc `/data/...`, ghi `/output/...`             |
-| `src/pipeline/checkpointing.py`   | Lưu state sau mỗi batch (chống sập)            |
-| `src/pipeline/dynamic_mapper.py`  | Lọc rác LLM, ánh xạ về A/B/C/D                 |
-| `src/pipeline/majority_voting.py` | Bầu chọn đáp án Toán (run multiple times)      |
-
-### 3.2. Các Agent Chuyên Biệt
-
-1. **Router Agent** (`src/agents/router.py`)
-   - **Nhiệm vụ**: Phân loại câu hỏi thành 3 loại: `FAST_QA`, `READING`, `CODEABLE`.
-   - **Kỹ thuật**: Sử dụng Few-shot để nhận diện cấu trúc câu.
-
-2. **Fast QA Agent** (`src/agents/fast_qa.py`)
-   - **Nhiệm vụ**: Zero-shot trả lời nhanh cho câu hỏi không yêu cầu suy luận sâu.
-   - **Prompt**: Simple Direct Answer.
-
-3. **Reading Agent** (`src/agents/reading.py`)
-   - **Nhiệm vụ**: Chain-of-Thought cho câu hỏi đọc hiểu phức tạp.
-   - **Prompt**: Step-by-step reasoning.
-
-4. **Coder Agent** (`src/agents/coder.py`)
-   - **Nhiệm vụ**: Sinh và thực thi code Python.
-   - **Tool**: Sử dụng `src/tools/python_sandbox.py` để thực thi code một cách an toàn.
-
-## 4. Hướng Dẫn Triển Khai (Deployment Guide)
-
-Dự án được thiết kế để chạy trong môi trường Docker của BTC.
-
-### 4.1. Dockerfile
-
-```dockerfile
-FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
-
-# Cài đặt dependencies
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Tạo workspace
-WORKDIR /app
-
-# Copy source code
-COPY src/ ./src/
-COPY deployment/entrypoint.sh ./
-COPY requirements.txt ./
-
-# Mount data
-VOLUME /data
-VOLUME /output
-
-# Chạy entry point
-CMD ["./entrypoint.sh"]
-```
-
-### 4.2. Entrypoint Script
-
+**Bước 1: Build Docker Image**
+Từ thư mục gốc (chứa `Dockerfile`), chạy lệnh sau để build image:
 ```bash
-#!/bin/bash
-
-echo "[Container] Starting HackAIthon Multi-Agent Pipeline..."
-python src/main.py
+docker build -t hackathon_agent:v1 .
 ```
 
-## 5. Hướng Dẫn Sử Dụng (Usage Guide)
+**Bước 2: Chuẩn bị thư mục dữ liệu trên máy trạm**
+Đảm bảo bạn có thư mục `data/` chứa file CSV đề thi và thư mục `output/` trống trên máy tính cục bộ.
 
-### 5.1. Chạy Test Local
-
+**Bước 3: Chạy Docker Container**
+Khởi chạy container, mount các volume tương ứng và cấp quyền cho container chạy mã (cần thiết cho Sandbox subprocess):
 ```bash
-# Cài dependencies
-pip install -r requirements.txt
-
-# Chạy 50 câu thử
-python scripts/run_test_local.py --num-questions 50
+docker run -v $(pwd)/data:/data -v $(pwd)/output:/output hackathon_agent:v1
 ```
 
-### 5.2. Build Docker Image
+*(Lưu ý: Đối với Windows PowerShell, thay `$(pwd)` bằng `${PWD}`).*
 
-```bash
-# Build
-./scripts/run_docker_build.sh
+### 3. Output Mong Đợi
+Sau khi container chạy hoàn tất quá trình xử lý:
+- Trong thư mục `/output`, bạn sẽ thấy file **`pred.csv`** chứa toàn bộ các cặp `qid,answer` chính xác (chỉ chứa các ký tự hoa A, B, C, D).
+- Bạn cũng sẽ tìm thấy tệp `pipeline_checkpoint.json` và file `pipeline.log` để phục vụ việc kiểm tra log hệ thống (nếu có lỗi xảy ra).
 
-# Chạy mô phỏng BTC
-./scripts/run_docker_test.sh
-```
+---
 
-## 6. Test Results (Kết quả Thử Nghiệm)
+## 📂 Cấu Trúc Mã Nguồn (Codebase Structure)
 
-### 6.1. Kết quả Test 50 câu Local
+Dự án được phân rã thành các Micro-Modules đảm bảo tính bảo trì cao:
+- `config/`: Cấu hình tham số hệ thống (`settings.yaml`) và logger.
+- `src/core/`: Kết nối và vận hành lõi LLM (Unsloth, dọn rác VRAM).
+- `src/agents/`: Chứa các node xử lý của Graph (Router, Fast-QA, Reading, Coder).
+- `src/tools/`: Môi trường giả lập (Sandbox) cho Python subprocess.
+- `src/pipeline/`: I/O dữ liệu, Checkpointing, Dynamic Mapper và Majority Voting.
+- `src/main.py`: Entry-point kết nối luồng đi của hệ thống.
 
-**Environment**: Unsloth 4-bit, 1 GPU RTX 3060.
-**Metrics**:
-
-- **Total Time**: ~15 phút
-- **Fast QA**: 1s/câu
-- **Coder**: 10-20s/câu
-- **Accuracy**: ~85% (chưa qua fine-tuning)
-
-### 6.2. Ưu Điểm Hệ Thống
-
-- **Multi-Agent**: Router thông minh giúp giảm tải LLM cho câu đơn giản.
-- **VRAM Efficient**: Unsloth 4-bit chỉ tốn ~6GB VRAM cho 14B params.
-- **Checkpointing**: Chống sập khi chạy 2000 câu.
-- **Sandbox**: Thực thi code an toàn, cách ly.
+---
+**Chúng tôi xin chân thành cảm ơn Ban Tổ Chức đã mang đến một sân chơi bổ ích!**
