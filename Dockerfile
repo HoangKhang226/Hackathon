@@ -14,8 +14,9 @@ ARG HF_TOKEN
 ENV HF_TOKEN=${HF_TOKEN}
 
 # Tải trước model weights vào Docker Image để chạy Offline
-RUN python -c "from huggingface_hub import snapshot_download; import yaml; \
+RUN python -c "from huggingface_hub import snapshot_download; import yaml, os; \
     cfg = yaml.safe_load(open('config/settings.yaml')); \
-    snapshot_download(repo_id=cfg['llm']['model_name'], token='${HF_TOKEN}')"
+    t = os.environ.get('HF_TOKEN', '').strip(); \
+    snapshot_download(repo_id=cfg['llm']['model_name'], token=t if t else None)"
 
 CMD ["python", "src/main.py"]
