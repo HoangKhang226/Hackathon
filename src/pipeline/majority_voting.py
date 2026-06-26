@@ -122,6 +122,8 @@ def run_majority_voting(state: GraphState, model, tokenizer, indices: list) -> G
         # Gọi batch_inference cho các vòng (hoặc gọi từng vòng để tăng tính độc lập)
         prompts = [prompt] * vote_cfg.num_runs
         raw_outputs = batch_inference(
+            model,
+            tokenizer,
             prompts,
             max_new_tokens=256,
             temperature=vote_cfg.temperature

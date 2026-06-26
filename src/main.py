@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 from src.core.llm_engine import load_model
 from src.pipeline.io_handler import load_test_data, save_predictions
 from src.pipeline.checkpointing import load_checkpoint, save_checkpoint
@@ -78,5 +79,4 @@ def main():
     logger.info("Pipeline completed successfully!")
 
 if __name__ == "__main__":
-    import pandas as pd
     main()

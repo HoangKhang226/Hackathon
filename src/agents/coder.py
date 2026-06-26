@@ -122,7 +122,7 @@ def coder_node(state: GraphState, model, tokenizer) -> GraphState:
             {"role": "user", "content": user_content}
         ], tokenize=False, add_generation_prompt=True)
 
-        raw_out = batch_inference([prompt], max_new_tokens=qa_cfg.max_new_tokens, temperature=qa_cfg.temperature)[0]
+        raw_out = batch_inference(model, tokenizer, [prompt], max_new_tokens=qa_cfg.max_new_tokens, temperature=qa_cfg.temperature)[0]
         code = _extract_code(raw_out)
         state["execution_codes"][idx] = code
 
@@ -168,7 +168,7 @@ def coder_node(state: GraphState, model, tokenizer) -> GraphState:
                     {"role": "user", "content": corr_user_content}
                 ], tokenize=False, add_generation_prompt=True)
 
-                raw_corr = batch_inference([corr_prompt], max_new_tokens=qa_cfg.max_new_tokens, temperature=qa_cfg.temperature)[0]
+                raw_corr = batch_inference(model, tokenizer, [corr_prompt], max_new_tokens=qa_cfg.max_new_tokens, temperature=qa_cfg.temperature)[0]
                 code = _extract_code(raw_corr)
                 state["execution_codes"][idx] = code
             else:
@@ -192,7 +192,7 @@ def coder_node(state: GraphState, model, tokenizer) -> GraphState:
                 {"role": "user", "content": fb_user_content}
             ], tokenize=False, add_generation_prompt=True)
 
-            raw_fb = batch_inference([fb_prompt], max_new_tokens=qa_cfg.max_new_tokens, temperature=qa_cfg.temperature)[0]
+            raw_fb = batch_inference(model, tokenizer, [fb_prompt], max_new_tokens=qa_cfg.max_new_tokens, temperature=qa_cfg.temperature)[0]
             # Lưu tạm kết quả Fallback vào final_answers (sẽ được dùng làm cơ sở Voting sau này)
             state["final_answers"][idx] = raw_fb
 

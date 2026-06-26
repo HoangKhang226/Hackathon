@@ -3,12 +3,28 @@ import os
 
 import pandas as pd
 
-def load_test_data(data_dir="/data"):
-    for name in ["private_test.csv", "public_test.csv"]:
-        path = os.path.join(data_dir, name)
-        if os.path.exists(path):
+def load_test_data(data_dir=None):
+    if data_dir is None:
+        data_dir = "/data" if os.path.exists("/data") else "./data"
+    if not os.path.exists(data_dir):
+        raise FileNotFoundError(f"Thư mục {data_dir} không tồn tại.")
+        
+    for file in os.listdir(data_dir):
+        path = os.path.join(data_dir, file)
+        if file.endswith(".csv"):
             return pd.read_csv(path)
-    raise FileNotFoundError("Không tìm thấy file test trong /data")
+        elif file.endswith(".json"):
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return pd.DataFrame(data)
+            elif isinstance(data, dict):
+                for key in ["questions", "data", "items"]:
+                    if key in data:
+                        return pd.DataFrame(data[key])
+                return pd.DataFrame([data])
+                
+    raise FileNotFoundError(f"Không tìm thấy file .csv hay .json nào trong {data_dir}")
 
 
 
@@ -35,7 +51,9 @@ def load_test_data_json(data_dir="/data"):
 
 
 
-def save_predictions(results: list, output_dir="/output"):
+def save_predictions(results: list, output_dir=None):
+    if output_dir is None:
+        output_dir = "/output" if os.path.exists("/data") else "./output"
     os.makedirs(output_dir, exist_ok=True)
     df = pd.DataFrame(results, columns=["qid", "answer"])
     df.to_csv(os.path.join(output_dir, "pred.csv"), index=False)

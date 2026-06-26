@@ -1,6 +1,8 @@
-unsloth
-torch
-transformers
+unsloth==2026.6.1
+transformers==5.5.0
+bitsandbytes==0.49.2
+torch==2.10.0
+accelerate
 pandas
 sympy
 pydantic
@@ -8,3 +10,4 @@ pydantic-settings
 python-dotenv
 PyYAML
 tqdm
+nest_asyncio
